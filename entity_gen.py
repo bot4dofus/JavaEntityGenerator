@@ -5,15 +5,14 @@ from functools import reduce
 # Usage: python ./entity_gen.py --equals --toString --hashCode --get --set --builder --class ClassName propertyType:propertyName ...
 
 parser = argparse.ArgumentParser(description='Generate class with properties')
-parser.add_argument('properties', metavar='Type:Name', nargs='+',
-                    help='properties to be used')
+parser.add_argument('properties', metavar='Type:Name', nargs='+', help='properties to be used')
 parser.add_argument('--class', dest="className", default="Entity")
-parser.add_argument('--equals', action='store_true')
-parser.add_argument('--toString', action='store_true')
-parser.add_argument('--hashCode', action='store_true')
+parser.add_argument('--constructor', action='store_true')
 parser.add_argument('--get', action='store_true')
 parser.add_argument('--set', action='store_true')
-parser.add_argument('--builder', action='store_true')
+parser.add_argument('--equals', action='store_true')
+parser.add_argument('--hashCode', action='store_true')
+parser.add_argument('--toString', action='store_true')
 
 args = parser.parse_args()
 
@@ -21,11 +20,14 @@ args = parser.parse_args()
 def createEntity(args):
     buildedString = ""
     buildedString += getImports()
-    buildedString += "\n"
+    buildedString += "\n\n"
     buildedString += getClassDefinition(args.className)
-    buildedString += "\n"
+    buildedString += "\n\n"
     buildedString += getPropertiesDefinition(args.properties, not args.set)
-    buildedString += "\n"
+
+    if args.constructor:
+        buildedString += getConstructor(args.className, args.properties)
+        buildedString += "\n\n"
 
     if args.get:
         buildedString += getGetFunctions(args.properties)
@@ -43,10 +45,6 @@ def createEntity(args):
 
     if args.toString:
         buildedString += getToString(args.properties)
-        buildedString += "\n"
-
-    if args.builder:
-        buildedString += getBuilder(args.className, args.properties)
         buildedString += "\n"
 
     buildedString += getClassClose()
@@ -67,7 +65,7 @@ def indent(num):
 
 def getImports():
     return """import java.util.Objects;
-import com.google.common.base.MoreObjects;"""
+    import com.google.common.base.MoreObjects;"""
 
 
 def getClassDefinition(className):
@@ -80,9 +78,26 @@ def getPropertiesDefinition(properites, isFinal):
     if isFinal:
         finalModifier = "final "
     for prop in properites:
-        str += indent(1) + "private " + finalModifier + getType(prop) + " " + getName(prop) + ";\n"
+        str += indent(1) + "private " + finalModifier + getType(prop) + " " + getName(prop) + ";\n\n"
     return str
 
+
+def getConstructor(className, properties):
+    is_first = True
+    
+    str = indent(1) + "public " + className + "("
+    for prop in properties:
+        if(is_first):
+            str += getType(prop) + " " + getName(prop)
+            is_first = False
+        else:
+            str += ", " + getType(prop) + " " + getName(prop)
+    str += ") {\n"
+    
+    for prop in properties:
+        str += indent(2) + "this." + getName(prop) + " = " + getName(prop) + ";\n"
+    str += indent(1) + "}"
+    return str
 
 def getGetFunctions(properites):
     str = ""
@@ -140,33 +155,6 @@ def getToString(properties):
         map(lambda x: "\n" + indent(3) + ".add(\"" + x + "\", " + x + ")",
             map(lambda x: getName(x), properties))) + ".toString();\n" + "    }"
     return str
-
-
-def getBuilder(className, properties):
-    str = getConstructorForBuilder(className, properties)
-    str += "\n"
-
-    str += getBuilderCreator()
-    str += "\n"
-
-    str += indent(1) + "public static class Builder{\n\n"
-    str += getPropertiesForBuilder(properties);
-    str += "\n"
-
-    str += getSettersForBuilder(properties)
-
-    str += getBuilderExecutor()
-    str += "\n"
-
-    str += indent(1) + "}\n"
-    return str
-
-
-def getConstructorForBuilder(className, properties):
-    str = indent(1) + "private " + className + "(Builder pBuilder){\n"
-    for prop in properties:
-        str += indent(2) + getName(prop) + " = pBuilder." + getName(prop) + ";\n"
-    return str + indent(1) + "}\n"
 
 
 def getBuilderCreator():
